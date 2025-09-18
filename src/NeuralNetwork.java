@@ -1,0 +1,209 @@
+import java.io.*; // 需要引入
+import java.util.ArrayList; // 需要引入
+import java.util.List; // 需要引入
+import java.util.Random;
+
+public class NeuralNetwork {
+
+    private Random random;
+
+    // 輸入層到隱藏層的權重矩陣
+    private double[][] weightsInputToHidden;
+    // 隱藏層到輸出層的權重矩陣
+    private double[][] weightsHiddenToOutput;
+
+    // 隱藏層的偏置陣列
+    private double[] biasHidden;
+    // 輸出層的偏置陣列
+    private double[] biasOutput;
+
+    // 神經網路的結構參數
+    private final int numInputs;
+    private final int numHidden;
+    private final int numOutputs;
+
+    // 儲存神經網路的基因組 (所有權重和偏置)
+    private double[] genome;
+
+    public NeuralNetwork(int numInputs, int numHidden, int numOutputs) {
+        this.numInputs = numInputs;
+        this.numHidden = numHidden;
+        this.numOutputs = numOutputs;
+        this.random = new Random();
+
+        // 初始化權重和偏置
+        weightsInputToHidden = new double[numInputs][numHidden];
+        weightsHiddenToOutput = new double[numHidden][numOutputs];
+        biasHidden = new double[numHidden];
+        biasOutput = new double[numOutputs];
+
+        // 計算基因組的總長度
+        int genomeSize = (numInputs * numHidden) + (numHidden * numOutputs) + numHidden + numOutputs;
+        genome = new double[genomeSize];
+    }
+
+    // 接收遊戲的輸入數據，並計算出輸出決策。
+    public int predict(double[] inputs) {
+        // 1. 計算隱藏層的輸出
+        double[] hiddenOutputs = new double[numHidden];
+        for (int i = 0; i < numHidden; i++) {
+            double sum = 0;
+            for (int j = 0; j < numInputs; j++) {
+                sum += inputs[j] * weightsInputToHidden[j][i];
+            }
+            sum += biasHidden[i];
+            // 使用 ReLU 激活函數
+            hiddenOutputs[i] = Math.max(0, sum);
+        }
+
+        // 2. 計算輸出層的輸出
+        double[] finalOutputs = new double[numOutputs];
+        for (int i = 0; i < numOutputs; i++) {
+            double sum = 0;
+            for (int j = 0; j < numHidden; j++) {
+                sum += hiddenOutputs[j] * weightsHiddenToOutput[j][i];
+            }
+            sum += biasOutput[i];
+            finalOutputs[i] = sum;
+        }
+
+        // 3. 找出最大值對應的索引，即為決策
+        int maxIndex = 0;
+        for (int i = 1; i < numOutputs; i++) {
+            if (finalOutputs[i] > finalOutputs[maxIndex]) {
+                maxIndex = i;
+            }
+        }
+        return maxIndex;
+    }
+
+    // 將一個基因組（double[] 陣列）載入到神經網路中，設定它的權重和偏置。
+    public void setGenome(double[] newGenome) {
+        this.genome = newGenome;
+        int index = 0;
+
+        // 從基因組中載入輸入層到隱藏層的權重
+        for (int i = 0; i < numInputs; i++) {
+            for (int j = 0; j < numHidden; j++) {
+                weightsInputToHidden[i][j] = genome[index++];
+            }
+        }
+
+        // 從基因組中載入隱藏層的偏置
+        for (int i = 0; i < numHidden; i++) {
+            biasHidden[i] = genome[index++];
+        }
+
+        // 從基因組中載入隱藏層到輸出層的權重
+        for (int i = 0; i < numHidden; i++) {
+            for (int j = 0; j < numOutputs; j++) {
+                weightsHiddenToOutput[i][j] = genome[index++];
+            }
+        }
+
+        // 從基因組中載入輸出層的偏置
+        for (int i = 0; i < numOutputs; i++) {
+            biasOutput[i] = genome[index++];
+        }
+    }
+
+    public double[] getGenome() {
+        return genome;
+    }
+
+
+    public double[] getFinalOutputs(double[] inputs) {
+        // 這裡的程式碼與 predict() 方法計算 finalOutputs 的部分完全相同
+
+        // 1. 計算隱藏層的輸出
+        double[] hiddenOutputs = new double[numHidden];
+        for (int i = 0; i < numHidden; i++) {
+            double sum = 0;
+            for (int j = 0; j < numInputs; j++) {
+                sum += inputs[j] * weightsInputToHidden[j][i];
+            }
+            sum += biasHidden[i];
+            hiddenOutputs[i] = Math.max(0, sum);
+        }
+
+        // 2. 計算輸出層的輸出
+        double[] finalOutputs = new double[numOutputs];
+        for (int i = 0; i < numOutputs; i++) {
+            double sum = 0;
+            for (int j = 0; j < numHidden; j++) {
+                sum += hiddenOutputs[j] * weightsHiddenToOutput[j][i];
+            }
+            sum += biasOutput[i];
+            finalOutputs[i] = sum;
+        }
+
+        return finalOutputs;
+    }
+
+    // 隨機化所有權重和偏置
+    public void randomizeGenome() {
+        for (int i = 0; i < genome.length; i++) {
+            // 隨機數介於 -1.0 到 1.0 之間
+            genome[i] = random.nextDouble() * 2 - 1;
+        }
+        // 將隨機的基因組設定給神經網路
+        setGenome(genome);
+    }
+
+    // Add these methods at the end of the NeuralNetwork class
+    public int getNumInputs() {
+        return numInputs;
+    }
+
+    public int getNumHidden() {
+        return numHidden;
+    }
+
+    public int getNumOutputs() {
+        return numOutputs;
+    }
+
+    public void saveGenome(String filePath) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
+            for (double gene : genome) {
+                writer.println(gene);
+            }
+            System.out.println("模型已成功儲存至: " + filePath);
+        } catch (IOException e) {
+            System.err.println("儲存模型時發生錯誤: " + e.getMessage());
+        }
+    }
+    /**
+     * 從檔案載入基因組來建立一個神經網路
+     * 這是一個靜態工廠方法
+     * @param filePath 檔案路徑
+     * @param numInputs 輸入層節點數
+     * @param numHidden 隱藏層節點數
+     * @param numOutputs 輸出層節點數
+     * @return 一個載入了權重的新 NeuralNetwork 物件，如果失敗則回傳 null
+     */
+    public static NeuralNetwork loadFromFile(String filePath, int numInputs, int numHidden, int numOutputs) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+            NeuralNetwork nn = new NeuralNetwork(numInputs, numHidden, numOutputs);
+            List<Double> loadedGenome = new ArrayList<>();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                loadedGenome.add(Double.parseDouble(line));
+            }
+
+            if (loadedGenome.size() != nn.getGenome().length) {
+                System.err.println("錯誤：檔案中的基因組長度與網路結構不符！");
+                return null;
+            }
+
+            double[] genomeArray = loadedGenome.stream().mapToDouble(d -> d).toArray();
+            nn.setGenome(genomeArray); // 非常重要的一步：將讀取的基因組設定到網路中
+            System.out.println("模型已成功從 " + filePath + " 載入。");
+            return nn;
+
+        } catch (IOException | NumberFormatException e) {
+            System.err.println("載入模型時發生錯誤: " + e.getMessage());
+            return null;
+        }
+    }
+}
