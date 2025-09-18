@@ -8,6 +8,15 @@ import java.awt.event.WindowEvent;
 public class SettingsFrame extends JFrame {
     private GamePanel gamePanel; // 新增：用來儲存 GamePanel 的參考
 
+    // 將視窗模式和全螢幕模式的邏輯整合
+    private static final String[] displayModes = {
+            "800x600 (無邊框視窗)",
+            "1025x775 (無邊框視窗)",
+            "1200x900 (無邊框視窗)",
+            "1280x720 (無邊框視窗)",
+            "1920x1080 (全螢幕)",
+    };
+
     public SettingsFrame(GamePanel gamePanel) {
         this.gamePanel = gamePanel; // 接收 GamePanel 實例
 
@@ -27,26 +36,41 @@ public class SettingsFrame extends JFrame {
             }
         });
 
-        JPanel panel = new JPanel(new GridLayout(3, 2, 10, 10));
+        JPanel panel = new JPanel(new GridLayout(2, 2, 10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         // 速度設定
         JLabel speedLabel = new JLabel("Speed (ms):");
-        JTextField speedField = new JTextField(String.valueOf(GameSettings.gameSpeed));
+        String[] speedOptions = new String[GameSettings.GAME_SPEEDS.length];
+        for (int i = 0; i < GameSettings.GAME_SPEEDS.length; i++) {
+            speedOptions[i] = GameSettings.GAME_SPEEDS[i] + " ms";
+        }
+        JComboBox<String> speedComboBox = new JComboBox<>(speedOptions);
+        speedComboBox.setSelectedIndex(GameSettings.speedIndex);
         panel.add(speedLabel);
-        panel.add(speedField);
+        panel.add(speedComboBox);
 
-        // 寬度設定
-        JLabel widthLabel = new JLabel("Width:");
-        JTextField widthField = new JTextField(String.valueOf(GameSettings.screenWidth));
-        panel.add(widthLabel);
-        panel.add(widthField);
-
-        // 高度設定
-        JLabel heightLabel = new JLabel("Height:");
-        JTextField heightField = new JTextField(String.valueOf(GameSettings.screenHeight));
-        panel.add(heightLabel);
-        panel.add(heightField);
+        // --- 畫面模式設定 ---
+        JLabel modeLabel = new JLabel("畫面模式:");
+        JComboBox<String> modeComboBox = new JComboBox<>(displayModes);
+        // 根據目前的設定來選擇正確的模式
+        int currentSizeIndex = GameSettings.sizeIndex;
+        if (GameSettings.screenWidth == 1920 && GameSettings.screenHeight == 1080) {
+            // 處理全螢幕情況
+            modeComboBox.setSelectedIndex(4);
+        } else {
+            // 處理視窗情況
+            // 遍歷所有視窗選項以找到對應的索引
+            for(int i = 0; i < 4; i++) {
+                if (GameSettings.screenWidth == GameSettings.SCREEN_SIZES[i][0] &&
+                        GameSettings.screenHeight == GameSettings.SCREEN_SIZES[i][1]) {
+                    modeComboBox.setSelectedIndex(i);
+                    break;
+                }
+            }
+        }
+        panel.add(modeLabel);
+        panel.add(modeComboBox);
 
         JPanel buttonPanel = new JPanel(new FlowLayout());
 
@@ -57,11 +81,11 @@ public class SettingsFrame extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 try {
                     // 更新 GameSettings 的值
-                    GameSettings.gameSpeed = Integer.parseInt(speedField.getText());
-                    GameSettings.screenWidth = Integer.parseInt(widthField.getText());
-                    GameSettings.screenHeight = Integer.parseInt(heightField.getText());
+                    GameSettings.speedIndex = speedComboBox.getSelectedIndex();
+                    GameSettings.sizeIndex = modeComboBox.getSelectedIndex();
 
-                    // 儲存設定
+                    // 更新參數並儲存
+                    GameSettings.updateGameParameters();
                     GameSettings.saveSettings();
                     // 呼叫 GamePanel 的方法來重新啟動遊戲
                     gamePanel.applyAndRestart();

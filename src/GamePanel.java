@@ -137,10 +137,24 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
 
         // 畫網格線 (選用)
         g.setColor(new Color(10, 10, 10, 30));
-        for (int i = 0; i < GameSettings.screenWidth / UNIT_SIZE; i++) {
+
+        /// 計算水平和垂直網格線的數量
+        /// 如果畫面尺寸不能被 UNIT_SIZE 整除，則多畫一條線
+        int horizontalLines = GameSettings.screenHeight / UNIT_SIZE;
+        if (GameSettings.screenHeight % UNIT_SIZE != 0) {
+            horizontalLines++;
+        }
+        int verticalLines = GameSettings.screenWidth / UNIT_SIZE;
+        if (GameSettings.screenWidth % UNIT_SIZE != 0) {
+            verticalLines++;
+        }
+
+        // 畫垂直網格線
+        for (int i = 0; i <= verticalLines; i++) { // 修正迴圈條件，確保從 0 到最後一條線都畫
             g.drawLine(offsetX + i * UNIT_SIZE, offsetY, offsetX + i * UNIT_SIZE, offsetY + GameSettings.screenHeight);
         }
-        for (int i = 0; i < GameSettings.screenHeight / UNIT_SIZE; i++) {
+        // 畫水平網格線
+        for (int i = 0; i <= horizontalLines; i++) { // 修正迴圈條件
             g.drawLine(offsetX, offsetY + i * UNIT_SIZE, offsetX + GameSettings.screenWidth, offsetY + i * UNIT_SIZE);
         }
 
