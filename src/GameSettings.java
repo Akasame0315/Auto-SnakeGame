@@ -10,7 +10,10 @@ public class GameSettings {
     public static int gameSpeed;
     public static int screenWidth;
     public static int screenHeight;
-    public static final int GENE_SIZE = 9; // 基因長度（與食物、牆壁、身體的距離權重）
+    // 基因長度 = (輸入層 * 隱藏層) + (隱藏層 * 輸出層) + 隱藏層偏置 + 輸出層偏置
+    // (24 * 16) + (16 * 3) + 16 + 3 = 384 + 48 + 16 + 3 = 451
+    public static final int GENE_SIZE = 451;
+    public static int UNIT_SIZE = 25; // 每個方塊的大小
 
     // 提供數個預設的速度選項 (單位：毫秒)
     public static final int[] GAME_SPEEDS = {150, 100, 75, 50, 25};
@@ -29,6 +32,7 @@ public class GameSettings {
     // 新增變數來儲存選項的索引，而不是直接儲存數值
     public static int speedIndex = 2; // 預設速度為第 3 個選項 (75ms)
     public static int sizeIndex = 0;  // 預設畫面為第 1 個選項 (800x600)
+    public static int MAX_STEPS = 250;
 
     // 讀取設定
     public static void loadSettings() {
@@ -57,6 +61,7 @@ public class GameSettings {
             e.printStackTrace();
         }
     }
+
     // 根據索引更新參數，以便在讀取和變更時使用
     public static void updateGameParameters() {
         gameSpeed = GAME_SPEEDS[speedIndex];
