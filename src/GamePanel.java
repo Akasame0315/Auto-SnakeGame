@@ -62,20 +62,22 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
         GeneticAlgorithmAI geneticAI = new GeneticAlgorithmAI(bestGenes -> {
             SwingUtilities.invokeLater(() -> {
                 // 步驟3: 訓練完成後，切換 GamePanel 的 AI 決策者
-                this.ai = new AI_Decision_Maker() {
-                    @Override
-                    public char decideDirection(List<Point> snakeBody, Point food, Dimension boardSize) {
-                        // 這裡應該是根據 `bestGenes` 運算決策的邏輯
+                this.ai = new NeuralNetworkAI(bestGenes);
+//                this.ai = new AI_Decision_Maker() {
+//                    @Override
+//                    public char decideDirection(List<Point> snakeBody, Point food, Dimension boardSize) {
+//                        // 這裡應該是根據 `bestGenes` 運算決策的邏輯
+//                        return getBestDirection(bestGenes, snakeBody, food, boardSize);
                         // 為了簡化，我們暫時使用一個簡單的範例
-                        double foodXDist = food.x - snakeBody.get(0).x;
-                        double foodYDist = food.y - snakeBody.get(0).y;
-                        if (Math.abs(foodXDist) > Math.abs(foodYDist)) {
-                            return (foodXDist > 0) ? 'R' : 'L';
-                        } else {
-                            return (foodYDist > 0) ? 'D' : 'U';
-                        }
-                    }
-                };
+//                        double foodXDist = food.x - snakeBody.get(0).x;
+//                        double foodYDist = food.y - snakeBody.get(0).y;
+//                        if (Math.abs(foodXDist) > Math.abs(foodYDist)) {
+//                            return (foodXDist > 0) ? 'R' : 'L';
+//                        } else {
+//                            return (foodYDist > 0) ? 'D' : 'U';
+//                        }
+//                    }
+//                };
                 System.out.println("AI train completed。The Snake smarter now！");
             });
         });
@@ -195,22 +197,21 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
         for (int i = 0; i <= horizontalLines; i++) { // 修正迴圈條件
             g.drawLine(offsetX, offsetY + i * UNIT_SIZE, offsetX + GameSettings.screenWidth, offsetY + i * UNIT_SIZE);
         }
+        // 畫蛇
+        for (int i = 0; i < snakeBody.size(); i++) {
+            if (i == 0) {
+                g.setColor(Color.green);
+            } else {
+                g.setColor(new Color(45, 180, 0));
+            }
+            g.fillRect(offsetX + snakeBody.get(i).x, offsetY + snakeBody.get(i).y, UNIT_SIZE, UNIT_SIZE);
+        }
 
         // 如果遊戲正在運行，畫蛇和食物
         if (running) {
             // 畫食物
             g.setColor(Color.red);
             g.fillOval(offsetX + food.x, offsetY + food.y, UNIT_SIZE, UNIT_SIZE);
-
-            // 畫蛇
-            for (int i = 0; i < snakeBody.size(); i++) {
-                if (i == 0) {
-                    g.setColor(Color.green);
-                } else {
-                    g.setColor(new Color(45, 180, 0));
-                }
-                g.fillRect(offsetX + snakeBody.get(i).x, offsetY + snakeBody.get(i).y, UNIT_SIZE, UNIT_SIZE);
-            }
         } else {
             // 遊戲結束畫面
             gameOver(g, offsetX, offsetY, this.getWidth());
@@ -223,16 +224,7 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
         if (running && !paused) {
             // 讓 AI 決定移動方向
             char aiDecision = ai.decideDirection(snakeBody, food, new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
-//            direction = aiDecision;
-
-            // 2. 檢查 AI 的決策是否為 180 度迴轉
-            if (isValidDirection(aiDecision)) {
-                // 如果決策有效，更新方向
-                direction = aiDecision;
-            } else {
-                // 如果無效，不改變方向，蛇會繼續前進
-                // 這個 else 區塊是空的，所以 direction 保持不變
-            }
+            direction = aiDecision;
 
             // 2. 準備移動
             Point newHead = new Point(snakeBody.get(0));
@@ -321,21 +313,21 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
         restartTimer.start();
     }
 
-    // 檢查方向是否合法（防止 180 度迴轉）
-    private boolean isValidDirection(char newDirection) {
-        switch (newDirection) {
-            case 'U':
-                return direction != 'D';
-            case 'D':
-                return direction != 'U';
-            case 'L':
-                return direction != 'R';
-            case 'R':
-                return direction != 'L';
-            default:
-                return false;
-        }
-    }
+//    // 檢查方向是否合法（防止 180 度迴轉）
+//    private boolean isValidDirection(char newDirection) {
+//        switch (newDirection) {
+//            case 'U':
+//                return direction != 'D';
+//            case 'D':
+//                return direction != 'U';
+//            case 'L':
+//                return direction != 'R';
+//            case 'R':
+//                return direction != 'L';
+//            default:
+//                return false;
+//        }
+//    }
     // 獨立的碰撞檢查方法，並回傳失敗原因
     public String checkCollisions() {
         Point head = snakeBody.get(0);
@@ -388,61 +380,61 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
     }
 
     // 檢查碰撞
-    private boolean isCollision(Point head, char direction, List<Point> snakeBody, Dimension boardSize) {
-        int nextX = head.x;
-        int nextY = head.y;
-        int UNIT_SIZE = 25; // 與 GamePanel 保持一致
-
-        switch (direction) {
-            case 'U': nextY -= UNIT_SIZE; break;
-            case 'D': nextY += UNIT_SIZE; break;
-            case 'L': nextX -= UNIT_SIZE; break;
-            case 'R': nextX += UNIT_SIZE; break;
-        }
-
-        // 檢查撞牆
-        if (nextX < 0 || nextX >= boardSize.width || nextY < 0 || nextY >= boardSize.height) {
-            return true;
-        }
-
-        // 檢查撞到自己
-        for (int i = 1; i < snakeBody.size(); i++) {
-            if (nextX == snakeBody.get(i).x && nextY == snakeBody.get(i).y) {
-                return true;
-            }
-        }
-        return false;
-    }
-    // 判斷當前方向
-    private char getCurrentDirection(List<Point> snakeBody) {
-        if (snakeBody.size() < 2) return 'R';
-        Point head = snakeBody.get(0);
-        Point neck = snakeBody.get(1);
-        if (head.x > neck.x) return 'R';
-        if (head.x < neck.x) return 'L';
-        if (head.y > neck.y) return 'D';
-        if (head.y < neck.y) return 'U';
-        return 'R';
-    }
-
-    // 計算左轉或右轉的方向
-    private char turnLeft(char direction) {
-        switch (direction) {
-            case 'U': return 'L';
-            case 'L': return 'D';
-            case 'D': return 'R';
-            case 'R': return 'U';
-        }
-        return direction;
-    }
-
-    private char turnRight(char direction) {
-        switch (direction) {
-            case 'U': return 'R';
-            case 'R': return 'D';
-            case 'D': return 'L';
-            case 'L': return 'U';
-        }
-        return direction;
-    }
+//    private boolean isCollision(Point head, char direction, List<Point> snakeBody, Dimension boardSize) {
+//        int nextX = head.x;
+//        int nextY = head.y;
+//        int UNIT_SIZE = 25; // 與 GamePanel 保持一致
+//
+//        switch (direction) {
+//            case 'U': nextY -= UNIT_SIZE; break;
+//            case 'D': nextY += UNIT_SIZE; break;
+//            case 'L': nextX -= UNIT_SIZE; break;
+//            case 'R': nextX += UNIT_SIZE; break;
+//        }
+//
+//        // 檢查撞牆
+//        if (nextX < 0 || nextX >= boardSize.width || nextY < 0 || nextY >= boardSize.height) {
+//            return true;
+//        }
+//
+//        // 檢查撞到自己
+//        for (int i = 1; i < snakeBody.size(); i++) {
+//            if (nextX == snakeBody.get(i).x && nextY == snakeBody.get(i).y) {
+//                return true;
+//            }
+//        }
+//        return false;
+//    }
+//    // 判斷當前方向
+//    private char getCurrentDirection(List<Point> snakeBody) {
+//        if (snakeBody.size() < 2) return 'R';
+//        Point head = snakeBody.get(0);
+//        Point neck = snakeBody.get(1);
+//        if (head.x > neck.x) return 'R';
+//        if (head.x < neck.x) return 'L';
+//        if (head.y > neck.y) return 'D';
+//        if (head.y < neck.y) return 'U';
+//        return 'R';
+//    }
+//
+//    // 計算左轉或右轉的方向
+//    private char turnLeft(char direction) {
+//        switch (direction) {
+//            case 'U': return 'L';
+//            case 'L': return 'D';
+//            case 'D': return 'R';
+//            case 'R': return 'U';
+//        }
+//        return direction;
+//    }
+//
+//    private char turnRight(char direction) {
+//        switch (direction) {
+//            case 'U': return 'R';
+//            case 'R': return 'D';
+//            case 'D': return 'L';
+//            case 'L': return 'U';
+//        }
+//        return direction;
+//    }
 }

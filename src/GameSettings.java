@@ -10,6 +10,7 @@ public class GameSettings {
     public static int gameSpeed;
     public static int screenWidth;
     public static int screenHeight;
+    public static final int GENE_SIZE = 9; // 基因長度（與食物、牆壁、身體的距離權重）
 
     // 提供數個預設的速度選項 (單位：毫秒)
     public static final int[] GAME_SPEEDS = {150, 100, 75, 50, 25};
