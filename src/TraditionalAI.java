@@ -1,11 +1,13 @@
-import java.awt.Dimension;
-import java.awt.Point;
+import java.awt.*;
 import java.util.List;
+import java.util.Random;
 
 // 初始遊戲演算判斷
 public class TraditionalAI implements AI_Decision_Maker {
 
     private static final int UNIT_SIZE = 25;
+    // 隨機數生成器
+    private static final Random random = new Random();
 
     @Override
     public char decideDirection(List<Point> snakeBody, Point food, Dimension boardSize) {
@@ -53,7 +55,8 @@ public class TraditionalAI implements AI_Decision_Maker {
         }
 
         // 如果真的沒路可走，隨便選一個方向 (這部分在你的原始程式碼中沒有，但這是必要的)
-        return currentDirection;
+        return new char[]{'U', 'D', 'L', 'R'}[random.nextInt(4)];
+        // return currentDirection;
     }
 
     // 從蛇身判斷當前移動方向

@@ -1,5 +1,4 @@
-import java.awt.Dimension;
-import java.awt.Point;
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -25,7 +24,7 @@ public class SnakeSimulator {
     // 遊戲步數
     private int steps;
     // 最大步數限制，避免無解時無限循環
-    private final int MAX_STEPS = 500;
+    private final int MAX_STEPS = 300;
 
     public SnakeSimulator(int width, int height) {
         this.SCREEN_WIDTH = width;
@@ -52,10 +51,15 @@ public class SnakeSimulator {
     // 初始化遊戲
     private void initGame() {
         snakeBody = new ArrayList<>();
+        int intiX = 0;
+        int intiY = 0;
         // 初始蛇長度為 3
-        snakeBody.add(new Point(0, 0));
-        snakeBody.add(new Point(0, 0));
-        snakeBody.add(new Point(0, 0));
+        snakeBody.add(new Point(intiX, intiY));
+        snakeBody.add(new Point(intiX - UNIT_SIZE, intiY));
+        snakeBody.add(new Point(intiX - UNIT_SIZE * 2, intiY));
+//        snakeBody.add(new Point(0, 0));
+//        snakeBody.add(new Point(0, 0));
+//        snakeBody.add(new Point(0, 0));
 
         direction = 'R'; // 預設向右
         running = true;

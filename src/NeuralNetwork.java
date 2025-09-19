@@ -1,6 +1,6 @@
-import java.io.*; // 需要引入
-import java.util.ArrayList; // 需要引入
-import java.util.List; // 需要引入
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 public class NeuralNetwork {
@@ -43,7 +43,7 @@ public class NeuralNetwork {
     }
 
     // 接收遊戲的輸入數據，並計算出輸出決策。
-    public int predict(double[] inputs) {
+    public double[] predict(double[] inputs) {
         if (inputs.length != numInputs) {
             throw new IllegalArgumentException(
                     "Expected input length " + numInputs + " but got " + inputs.length);
@@ -57,7 +57,8 @@ public class NeuralNetwork {
                 maxIndex = i;
             }
         }
-        return maxIndex;
+        
+        return finalOutputs;
     }
 
     // 將一個基因組（double[] 陣列）載入到神經網路中，設定它的權重和偏置。
@@ -146,6 +147,25 @@ public class NeuralNetwork {
             System.err.println("儲存模型時發生錯誤: " + e.getMessage());
         }
     }
+
+    /**
+     * 將當前的神經網路（基因組）儲存到檔案中
+     *
+     * @param filePath 檔案路徑
+     */
+    public void saveToFile(String filePath) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+            for (double gene : this.genome) {
+                writer.write(String.valueOf(gene));
+                writer.newLine();
+            }
+            System.out.println("model save to: " + filePath);
+        } catch (IOException e) {
+            System.err.println("Have error when save model: " + e.getMessage());
+        }
+    }
+
+
     /**
      * 從檔案載入基因組來建立一個神經網路
      * 這是一個靜態工廠方法

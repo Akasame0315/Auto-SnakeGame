@@ -22,4 +22,8 @@ public class Individual {
     public void setFitness(int fitness) {
         this.fitness = fitness;
     }
+
+    public int getFitness() {
+        return fitness;
+    }
 }

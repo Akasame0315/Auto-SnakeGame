@@ -1,179 +1,192 @@
-import java.awt.*;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
+import java.util.List;
 
-// 繼承 AI_Decision_Maker 介面
 public class GeneticAlgorithmAI {
 
-    // 演算法參數
-    private static final int POPULATION_SIZE = 100;  // 族群大小
-//    private static final int GENE_SIZE = 9;         // 基因長度（與食物、牆壁、身體的距離權重，每個因素各有三個方向）
-    private static final double MUTATION_RATE = 0.1; // 突變機率
-    private static final int MAX_GENERATIONS = 500; // 最大世代數
+    private static final String GENE_FILE = "best_genes.txt";
+    private static final String LOG_FILE = "training_log.txt";
 
-    // 遊戲環境參數（與 GamePanel 相同）
-    private static final int UNIT_SIZE = 25;
+    private static final int POPULATION_SIZE = 700; // 族群大小
+    private static final double MUTATION_RATE = 0.05; //通常突變率會設定在 1% 到 5% (0.01 ~ 0.05) 之間。過高的突變率會讓演算法難以收斂到最佳解；過低則可能陷入局部最優解
+    private static final int MAX_GENERATIONS = 10000; // 最大世代數
+    private static final int ELITE_COUNT = (int) (POPULATION_SIZE * 0.1); // 保留前 10% 的精英。這是一個非常標準且有效的做法（稱為「精英主義」），可以確保每一代的最優個體不會因為交叉或突變而丟失。
 
-    // 遊戲環境參數
-//    private static final int GAME_WIDTH = 800; // 你可以根據需求調整
-//    private static final int GAME_HEIGHT = 600; // 你可以根據需求調整
-    private static final int GAME_WIDTH = GameSettings.screenWidth;
-    private static final int GAME_HEIGHT = GameSettings.screenHeight;
-
-    // 隨機數生成器
-    private static final Random random = new Random();
+    private final Random random = new Random();
     // 訓練好的最佳基因
     private double[] bestGenes;
-    private TrainingCompletionListener listener;
+    private int bestFitness = -1;
+    private final SnakeSimulator simulator;
 
-    public GeneticAlgorithmAI(TrainingCompletionListener listener) {
-        this.listener = listener;
+    public GeneticAlgorithmAI(int width, int height) {
         // 注意：建構子中不再進行訓練，它只負責初始化
+        this.simulator = new SnakeSimulator(width, height);
     }
 
-    // 定義一個回呼介面，用於在訓練完成時通知遊戲
-    public interface TrainingCompletionListener {
-        void onTrainingComplete(double[] bestGenes);
-    }
+    //  支援儲存和載入基因，並將輸出轉為日誌檔案，同時在訓練中途也能夠記錄進度。
+    public void startTraining() {
+        writeToLog("AI Training started...");
 
-//    // 個體類別，代表一條蛇和它的基因
-//    private static class Individual {
-//        double[] genes = new double[GameSettings.GENE_SIZE]; // 基因組：權重
-//        int fitness; // 適應度：遊戲得分
-//
-//        // You can also add a constructor for easy initialization.
-//        public Individual(int geneSize) {
-//            this.genes = new double[geneSize];
-//        }
-//    }
-
-    // 訓練紀錄
-    private static class TrainingRecord {
-        int generation;
-        double fitness;
-        double[] genes;
-
-        public TrainingRecord(int generation, double fitness, double[] genes) {
-            this.generation = generation;
-            this.fitness = fitness;
-            this.genes = genes;
-        }
-    }
-
-    /**
-     * 遺傳演算法訓練流程
-     */
-    public void startTraining() { // 使用 CompletableFuture 在背景執行緒中執行訓練
         CompletableFuture.runAsync(() -> {
-            Individual[] population = new Individual[POPULATION_SIZE];
-            for (int i = 0; i < POPULATION_SIZE; i++) {
-                population[i] = new Individual(GameSettings.GENE_SIZE);
-                for (int j = 0; j < GameSettings.GENE_SIZE; j++) {
-                    population[i].genes[j] = random.nextDouble() * 2 - 1;
-                }
+            Individual[] population = initializePopulation();
+
+            // 嘗試從檔案載入上次訓練的進度
+            double[] loadedGenes = loadGenes();
+            if (loadedGenes != null) {
+                Individual bestIndividual = new Individual(GameSettings.GENE_SIZE);
+                bestIndividual.genes = loadedGenes;
+                population[0] = bestIndividual; // 將載入的基因作為精英個體
+                System.out.println("Resuming training from a previously saved model.");
+                writeToLog("Resuming training from a previously saved model.");
             }
 
             for (int generation = 0; generation < MAX_GENERATIONS; generation++) {
-//                for (Individual individual : population) {
-//                    individual.fitness = simulateGame(individual.genes);
-//                }
-                // 2. Evaluation - Call the new, refactored method here.
                 evaluatePopulation(population);
 
-                Arrays.sort(population, Comparator.comparingInt(i -> i.fitness));
+                Arrays.sort(population, Comparator.comparingInt(Individual::getFitness).reversed());
 
-                // 記錄當前世代的最佳適應度和基因
-                Individual bestIndividual = population[POPULATION_SIZE - 1];
-//                trainingRecords.add(new TrainingRecord(generation, bestIndividual.fitness, bestIndividual.genes));
-                System.out.println("Generation " + generation + "：Best Fitness = " + bestIndividual.fitness);
+                Individual bestInGeneration = population[0];
+
+                if (bestInGeneration.getFitness() > bestFitness) {
+                    bestFitness = bestInGeneration.getFitness();
+                    bestGenes = bestInGeneration.genes;
+                    writeToLog("Generation " + (generation + 1) + " - New Best Fitness: " + bestFitness);
+                    saveBestGenes(); // 找到更好的基因時立即保存
+                } else {
+                    writeToLog("Generation " + (generation + 1) + " - Best Fitness: " + bestInGeneration.getFitness());
+                }
+                if(generation % 100 == 0){
+                    System.out.println("Generation " +(generation + 1) + "：Best Fitness = " +  bestInGeneration.getFitness());
+                }
+//                System.out.println("Generation " +(generation + 1) + "：Best Fitness = " +  bestInGeneration.getFitness());
+
+                Individual[] nextPopulation = new Individual[POPULATION_SIZE];
+                for (int i = 0; i < ELITE_COUNT; i++) {
+                    nextPopulation[i] = population[i];
+                }
 
                 // 交叉與突變...
-                Individual[] nextPopulation = new Individual[POPULATION_SIZE];
-                nextPopulation[0] = population[POPULATION_SIZE - 1];
-                for (int i = 1; i < POPULATION_SIZE; i++) {
-                    Individual parent1 = population[random.nextInt(POPULATION_SIZE / 2) + POPULATION_SIZE / 2];
-                    Individual parent2 = population[random.nextInt(POPULATION_SIZE / 2) + POPULATION_SIZE / 2];
-
-                    Individual child = new Individual(GameSettings.GENE_SIZE);
-                    int crossoverPoint = random.nextInt(GameSettings.GENE_SIZE);
-                    for (int j = 0; j < GameSettings.GENE_SIZE; j++) {
-                        child.genes[j] = (j < crossoverPoint) ? parent1.genes[j] : parent2.genes[j];
-                    }
-                    if (random.nextDouble() < MUTATION_RATE) {
-                        child.genes[random.nextInt(GameSettings.GENE_SIZE)] = random.nextDouble() * 2 - 1;
-                    }
-                    nextPopulation[i] = child;
+                for (int i = ELITE_COUNT; i < POPULATION_SIZE; i++) {
+                    Individual parent1 = selectParent(population);
+                    Individual parent2 = selectParent(population);
+                    nextPopulation[i] = crossover(parent1, parent2);
+                    mutate(nextPopulation[i]);
                 }
                 population = nextPopulation;
-                System.out.println("Generation " + generation + "：Best Fitness = " + population[0].fitness);
             }
 
-            // 4. Finalization
-            Individual finalBestIndividual = population[POPULATION_SIZE - 1];
-            this.bestGenes = finalBestIndividual.getGenes();
-
-//            this.bestGenes = population[0].genes;
-            System.out.println("AI Training Finished. Best Genes: " + Arrays.toString(bestGenes));
-
-//            exportTrainingHistory();
-
-            // 訓練完成後，通知遊戲
-            if (listener != null) {
-                listener.onTrainingComplete(bestGenes);
-            }
-        });
+            writeToLog("AI Training Finished. Final Best Fitness: " + bestFitness);
+            writeToLog("Best Genes have been saved to " + GENE_FILE);
+            System.out.println("AI Training Finished. Final Best Fitness: " + bestFitness);
+            System.out.println("Best Genes have been saved to " + GENE_FILE);
+        }).join();
     }
 
-    /**
-     *注意：這裡需要一個完整的遊戲模擬器**
-     * 模擬遊戲來評估基因的適應度
-     * 這是你論文的重點：你需要設計一個能夠讓蛇根據基因移動的演算法
-//     * @param genes 基因組
-     * @return 遊戲得分（適應度）
-     */
-    private int simulateGame(AI_Decision_Maker ai) {
-        SnakeSimulator simulator = new SnakeSimulator(GameSettings.screenWidth, GameSettings.screenHeight);
-        SnakeSimulator.SimulationResult result = simulator.run(ai);
-        // 適應度計算公式：得分*1000 + 步數
+    // 根據模擬結果計算個體的適應度
+    private int calculateFitness(SnakeSimulator.SimulationResult result) {
         int fitness = 0;
+        // 增加分數的權重，並扣除步數，鼓勵蛇吃食物且盡可能走得久0m
         fitness += result.score * 1000;
-        fitness += result.steps * 300;
+        fitness += result.steps * 1;
+
+        // 給予「活著」的懲罰，鼓勵蛇更有效率地尋找食物
+        // 這可以避免蛇漫無目的的活著而不去尋找食物
+        fitness -= result.steps;
+
+        // 如果在達到最大步數前沒有吃到食物，適應度會被扣分
+        if(result.score == 0 && result.steps >= GameSettings.MAX_STEPS) {
+            fitness = fitness / 10;
+        }
+        
         return fitness;
     }
-    // This method's sole purpose is to evaluate the fitness of the current population.
+
+    private Individual[] initializePopulation() {
+        Individual[] population = new Individual[POPULATION_SIZE];
+        for (int i = 0; i < POPULATION_SIZE; i++) {
+            population[i] = new Individual(GameSettings.GENE_SIZE);
+            // *** 為新個體隨機化基因 ***
+            for (int j = 0; j < GameSettings.GENE_SIZE; j++) {
+                // 隨機數介於 -1.0 到 1.0 之間
+                population[i].genes[j] = random.nextDouble() * 2 - 1;
+            }
+        }
+        return population;
+    }
+
     private void evaluatePopulation(Individual[] population) {
         for (Individual individual : population) {
-            // Here, we create an AI for this specific individual's genes
             AI_Decision_Maker ai = new NeuralNetworkAI(individual.getGenes());
 
-            // And then simulate the game with that AI to get its fitness
-            individual.setFitness(simulateGame(ai));
+//            individual.setFitness(simulator.run(ai).fitness);
+            SnakeSimulator.SimulationResult result = simulator.run(ai);
+            int fitness = 0;
+//            fitness = (result.score) * 1000 - result.steps;
+            fitness = result.score * 1000 + result.steps * 10;
+
+            if(result.steps >= 50) {
+                fitness -= 500;
+            }
+            individual.setFitness(fitness);
         }
     }
 
-//    @Override
-//    public char decideDirection(List<Point> snakeBody, Point food, Dimension boardSize) {
-//        // 你需要在這裡實現根據基因決策的邏輯
-//        // 這是你論文的重點之一，需要仔細設計
-//        if (bestGenes == null) {
-//            // 如果還沒訓練好，使用隨機方向
-//            return new char[]{'U', 'D', 'L', 'R'}[random.nextInt(4)];
-//        }
-//
-//        return getBestDirection(bestGenes, snakeBody, food, boardSize);
-//    }
+    private Individual selectParent(Individual[] population) {
+        Individual best = null;
+        for (int i = 0; i < 5; i++) {
+            Individual contender = population[random.nextInt(POPULATION_SIZE)];
+            if (best == null || contender.getFitness() > best.getFitness()) {
+                best = contender;
+            }
+        }
+        return best;
+    }
 
-    // 將訓練歷史匯出至 JSON 檔案
-//    private void exportTrainingHistory() {
-//        Gson gson = new Gson();
-//        try (FileWriter writer = new FileWriter(HISTORY_FILE)) {
-//            gson.toJson(trainingRecords, writer);
-//            System.out.println("訓練記錄已匯出至 " + HISTORY_FILE);
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//    }
+    private Individual crossover(Individual parent1, Individual parent2) {
+        Individual child = new Individual(GameSettings.GENE_SIZE);
+        int crossoverPoint = random.nextInt(GameSettings.GENE_SIZE);
+        for (int i = 0; i < GameSettings.GENE_SIZE; i++) {
+            child.genes[i] = (i < crossoverPoint) ? parent1.genes[i] : parent2.genes[i];
+        }
+        return child;
+    }
+
+    private void mutate(Individual individual) {
+        if (random.nextDouble() < MUTATION_RATE) {
+            individual.genes[random.nextInt(GameSettings.GENE_SIZE)] = random.nextDouble() * 2 - 1;
+        }
+    }
+
+    private double[] loadGenes() {
+        NeuralNetwork nn = NeuralNetwork.loadFromFile(GENE_FILE,24, 16, 3);
+        return (nn != null) ? nn.getGenome() : null;
+    }
+
+    // 將最佳基因儲存到檔案中
+    private void saveBestGenes() {
+        if (bestGenes != null) {
+            // 根據您的神經網路結構，建立一個新的 NeuralNetwork 實例
+            NeuralNetwork bestAI = new NeuralNetwork(24, 16, 3);
+            // 將最佳基因設定為此神經網路的基因組
+            bestAI.setGenome(bestGenes);
+            // 呼叫實例方法來儲存檔案
+            bestAI.saveToFile(GENE_FILE);
+            System.out.println("Best gene save to: " + GENE_FILE);
+        }
+    }
+
+    private void writeToLog(String message) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(LOG_FILE, true))) {
+            writer.write(message);
+            writer.newLine();
+        } catch (IOException e) {
+            System.err.println("Error writing to log file: " + e.getMessage());
+        }
+    }
+
 }
