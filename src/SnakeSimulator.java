@@ -24,13 +24,14 @@ public class SnakeSimulator {
     // 遊戲步數
     private int steps;
     // 最大步數限制，避免無解時無限循環
-    private final int MAX_STEPS = 300;
+    private int MAX_STEPS = 300;
 
     public SnakeSimulator(int width, int height) {
         this.SCREEN_WIDTH = width;
         this.SCREEN_HEIGHT = height;
         this.GAME_UNITS = (SCREEN_WIDTH * SCREEN_HEIGHT) / (UNIT_SIZE * UNIT_SIZE);
         this.random = new Random();
+        this.MAX_STEPS =  SCREEN_WIDTH + SCREEN_HEIGHT;
     }
 
     // 執行一場完整的遊戲，並回傳得分與步數
@@ -57,9 +58,6 @@ public class SnakeSimulator {
         snakeBody.add(new Point(intiX, intiY));
         snakeBody.add(new Point(intiX - UNIT_SIZE, intiY));
         snakeBody.add(new Point(intiX - UNIT_SIZE * 2, intiY));
-//        snakeBody.add(new Point(0, 0));
-//        snakeBody.add(new Point(0, 0));
-//        snakeBody.add(new Point(0, 0));
 
         direction = 'R'; // 預設向右
         running = true;

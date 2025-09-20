@@ -28,12 +28,18 @@ public class GamePanel extends JPanel {
     private char direction = 'R';
     private String failureReason = "";
 
+    // 遊戲步數
+    private int steps;
+    private int MAX_STEPS;
+
     public GamePanel(int screenWidth, int screenHeight, AI_Decision_Maker ai, Consumer<Void> restartAction) {
         this.SCREEN_WIDTH = screenWidth;
         this.SCREEN_HEIGHT = screenHeight;
         this.GAME_UNITS = (SCREEN_WIDTH * SCREEN_HEIGHT) / (UNIT_SIZE * UNIT_SIZE);
         this.ai = ai;
         this.restartAction = restartAction;
+        this.steps = 0;
+        this.MAX_STEPS = SCREEN_WIDTH * SCREEN_HEIGHT;
 
         // 設定面板填滿整個視窗
         this.setPreferredSize(new Dimension(Toolkit.getDefaultToolkit().getScreenSize()));
@@ -194,6 +200,13 @@ public class GamePanel extends JPanel {
         }
     }
 
+    public void checkMaxStep(){
+        if(steps > MAX_STEPS){
+            running = false;
+            failureReason = "The snake is in the Endless loop!";
+        }
+    }
+
     public void gameOver(Graphics g, int offsetX, int offsetY) {
 
         // 顯示分數
@@ -201,7 +214,7 @@ public class GamePanel extends JPanel {
         g.setFont(new java.awt.Font("Ink Free", java.awt.Font.BOLD, 40));
         java.awt.FontMetrics metrics1 = getFontMetrics(g.getFont());
         int score = snakeBody.size() - 3; // 初始長度為 3
-        g.drawString("Score: " + score, (panelWidth - metrics1.stringWidth("Score: " + score)) / 2, offsetY + g.getFont().getSize());
+        g.drawString("Score: " + score, (SCREEN_WIDTH - metrics1.stringWidth("Score: " + score)) / 2, offsetY + g.getFont().getSize());
 
         // 顯示失敗原因
         g.setColor(Color.red);
@@ -253,8 +266,10 @@ public class GamePanel extends JPanel {
     }
 
     public void updateGame() {
+        steps++;
         move();
         checkCollisions();
+        checkMaxStep();
         repaint();
     }
 }

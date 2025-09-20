@@ -11,8 +11,8 @@ public class GameSettings {
     public static int screenWidth;
     public static int screenHeight;
     // 基因長度 = (輸入層 * 隱藏層) + (隱藏層 * 輸出層) + 隱藏層偏置 + 輸出層偏置
-    // (24 * 16) + (16 * 3) + 16 + 3 = 384 + 48 + 16 + 3 = 451
-    public static final int GENE_SIZE = 451;
+    // (22 * 16) + (16 * 3) + 16 + 3 = 352 + 48 + 16 + 3 = 355
+    public static final int GENE_SIZE = 419;
     public static int UNIT_SIZE = 25; // 每個方塊的大小
 
     // 提供數個預設的速度選項 (單位：毫秒)
@@ -32,7 +32,7 @@ public class GameSettings {
     // 新增變數來儲存選項的索引，而不是直接儲存數值
     public static int speedIndex = 2; // 預設速度為第 3 個選項 (75ms)
     public static int sizeIndex = 0;  // 預設畫面為第 1 個選項 (800x600)
-    public static int MAX_STEPS = 250;
+    public static int MAX_STEPS = 500;
 
     // 讀取設定
     public static void loadSettings() {
@@ -67,5 +67,6 @@ public class GameSettings {
         gameSpeed = GAME_SPEEDS[speedIndex];
         screenWidth = SCREEN_SIZES[sizeIndex][0];
         screenHeight = SCREEN_SIZES[sizeIndex][1];
+        MAX_STEPS = screenWidth + screenHeight;
     }
 }

@@ -16,10 +16,10 @@ public class Train {
         GeneticAlgorithmAI trainer = new GeneticAlgorithmAI(GameSettings.screenWidth, GameSettings.screenHeight);
         trainer.startTraining();
 
-        // 在訓練完成後，啟動遊戲主程式
-        SwingUtilities.invokeLater(() -> {
-            GameSettings.loadSettings();
-            new Main().createAndShowGUI();
-        });
+//        // 在訓練完成後，啟動遊戲主程式
+//        SwingUtilities.invokeLater(() -> {
+//            GameSettings.loadSettings();
+//            new Main().createAndShowGUI();
+//        });
     }
 }

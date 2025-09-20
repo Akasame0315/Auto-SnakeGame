@@ -8,7 +8,7 @@ public class Individual {
 
     // fitness: This is the snake's score. It's an integer that represents
     // how well the snake performed in a single game simulation.
-    public int fitness;
+    public double fitness;
 
     // A constructor to easily create a new Individual with a given gene size.
     public Individual(int geneSize) {
@@ -19,11 +19,11 @@ public class Individual {
         return genes;
     }
 
-    public void setFitness(int fitness) {
+    public void setFitness(double fitness) {
         this.fitness = fitness;
     }
 
-    public int getFitness() {
+    public double getFitness() {
         return fitness;
     }
 }

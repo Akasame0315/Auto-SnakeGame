@@ -50,12 +50,17 @@ public class NeuralNetwork {
         }
 
         double[] finalOutputs = computeOutputs(inputs);
+
         // 3. 找出最大值對應的索引，即為決策
-        int maxIndex = 0;
-        for (int i = 1; i < numOutputs; i++) {
-            if (finalOutputs[i] > finalOutputs[maxIndex]) {
-                maxIndex = i;
-            }
+        // 使用Softmax激活函數，讓輸出更像概率分布
+        double sum = 0;
+        for (int i = 0; i < finalOutputs.length; i++) {
+            finalOutputs[i] = Math.exp(finalOutputs[i]);
+            sum += finalOutputs[i];
+        }
+
+        for (int i = 0; i < finalOutputs.length; i++) {
+            finalOutputs[i] /= sum;
         }
         
         return finalOutputs;
@@ -90,18 +95,23 @@ public class NeuralNetwork {
             biasOutput[i] = genome[index++];
         }
     }
+
+    // ============== 改進的隱藏層計算 ==============
+    // ReLU (Rectified Linear Unit) 啟動函數、線性激活
     private double[] computeOutputs(double[] inputs) {
         double[] hiddenOutputs = new double[numHidden];
 
+        // 隱藏層使用ReLU
         for (int i = 0; i < numHidden; i++) {
             double sum = 0;
             for (int j = 0; j < numInputs; j++) {
                 sum += inputs[j] * weightsInputToHidden[j][i];
             }
-            sum += biasHidden[i];
+            sum += biasHidden[i]; //在加權求和的結果上，再加入一個偏差值 biasHidden[i]。這個偏差就像是神經元的“基礎活化度”，即使輸入都是零，它也會產生一個非零的輸出。
             hiddenOutputs[i] = Math.max(0, sum);
         }
 
+        // 輸出層使用線性激活（配合後續的Softmax）
         double[] finalOutputs = new double[numOutputs];
         for (int i = 0; i < numOutputs; i++) {
             double sum = 0;
@@ -125,27 +135,6 @@ public class NeuralNetwork {
         }
 
         return computeOutputs(inputs);
-    }
-
-    // 隨機化所有權重和偏置
-    public void randomizeGenome() {
-        for (int i = 0; i < genome.length; i++) {
-            // 隨機數介於 -1.0 到 1.0 之間
-            genome[i] = random.nextDouble() * 2 - 1;
-        }
-        // 將隨機的基因組設定給神經網路
-        setGenome(genome);
-    }
-
-    public void saveGenome(String filePath) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
-            for (double gene : genome) {
-                writer.println(gene);
-            }
-            System.out.println("模型已成功儲存至: " + filePath);
-        } catch (IOException e) {
-            System.err.println("儲存模型時發生錯誤: " + e.getMessage());
-        }
     }
 
     /**
