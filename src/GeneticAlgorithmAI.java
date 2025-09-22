@@ -56,14 +56,13 @@ public class GeneticAlgorithmAI {
                     bestFitness = bestInGeneration.getFitness();
                     bestGenes = bestInGeneration.genes;
                     writeToLog("Generation " + (generation + 1) + " - New Best Fitness: " + bestFitness);
+                    System.out.println("Generation " +(generation + 1) + "：New Best Fitness = " +  bestInGeneration.getFitness());
                     saveBestGenes(); // 找到更好的基因時立即保存
+                }else if(generation % 100 == 0){
+                    System.out.println("Generation " +(generation + 1) + "：Best Fitness = " +  bestInGeneration.getFitness());
                 } else {
                     writeToLog("Generation " + (generation + 1) + " - Best Fitness: " + bestInGeneration.getFitness());
                 }
-                if(generation % 100 == 0){
-                    System.out.println("Generation " +(generation + 1) + "：Best Fitness = " +  bestInGeneration.getFitness());
-                }
-//                System.out.println("Generation " +(generation + 1) + "：Best Fitness = " +  bestInGeneration.getFitness());
 
                 Individual[] nextPopulation = new Individual[POPULATION_SIZE];
                 for (int i = 0; i < ELITE_COUNT; i++) {
@@ -128,15 +127,14 @@ public class GeneticAlgorithmAI {
             double fitness = 0;
             if (result.score == 0) {
                 // 沒吃到食物的懲罰減輕，但仍要鼓勵存活
-//                fitness = Math.max(1, result.steps / 4); // 最少給1分，避免完全沒獎勵
-                fitness = Math.log(result.steps + 1) * 2.0; // 對數增長的生存獎勵
+                fitness = Math.log(result.steps + 1) * 0.5; // 對數增長的生存獎勵
             } else {
                 // 效率計算
                 double avgStepsPerFood = (double) result.steps / result.score;
-                double idealSteps = 15.0; // 假設理想平均步數
+//                double idealSteps = 15.0; // 假設理想平均步數
 
                 // 主要分數：食物 × 效率獎勵
-                double efficiencyMultiplier = Math.max(0.1, idealSteps / avgStepsPerFood);
+                double efficiencyMultiplier = Math.max(0.1, idealStepsPerFood / avgStepsPerFood);
                 if (efficiencyMultiplier > 1.0) {
                     efficiencyMultiplier = Math.pow(efficiencyMultiplier, 2.0); // 高效率平方獎勵
                 }
@@ -144,11 +142,18 @@ public class GeneticAlgorithmAI {
                 fitness = result.score * 1000.0 * efficiencyMultiplier;
 
                 // 微小的生存獎勵（避免完全忽略）
-                fitness += Math.log(result.steps + 1) * 5.0;
+                fitness += Math.log(result.steps + 1) * 1.5;
 
                 // 長度獎勵
                 fitness += Math.pow(result.score + 3, 1.2) * 50.0;
             }
+
+            // <<< 核心修改：將過程獎勵加入總適應度
+            // proximityReward 的權重需要調整，確保它既能產生引導作用，
+            // 又不至於壓過「吃到食物」這個主要目標的重要性。
+            // 可以先從一個較小的值開始，例如 1.0 或 5.0。
+            double proximityWeight = 10.0; // 這是一個超參數，需要實驗調整
+            fitness += result.proximityReward * proximityWeight;
 
             // 確保適應度不會是負數
             individual.setFitness(Math.max(1.0, fitness));
@@ -221,7 +226,7 @@ public class GeneticAlgorithmAI {
             bestAI.setGenome(bestGenes);
             // 呼叫實例方法來儲存檔案
             bestAI.saveToFile(GENE_FILE);
-            System.out.println("Best gene save to: " + GENE_FILE);
+//            System.out.println("Best gene save to: " + GENE_FILE);
         }
     }
 

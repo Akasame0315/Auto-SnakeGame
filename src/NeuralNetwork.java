@@ -148,7 +148,7 @@ public class NeuralNetwork {
                 writer.write(String.valueOf(gene));
                 writer.newLine();
             }
-            System.out.println("model save to: " + filePath);
+            System.out.println("Best gene save to: " + filePath);
         } catch (IOException e) {
             System.err.println("Have error when save model: " + e.getMessage());
         }

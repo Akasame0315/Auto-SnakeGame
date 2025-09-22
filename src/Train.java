@@ -12,9 +12,10 @@ public class Train {
 //        GameSettings.screenWidth = 800;
 //        GameSettings.screenHeight = 600;
         GameSettings.loadSettings();
-
-        GeneticAlgorithmAI trainer = new GeneticAlgorithmAI(GameSettings.screenWidth, GameSettings.screenHeight);
-        trainer.startTraining();
+        for(var i = 0; i < 5; i++){
+            GeneticAlgorithmAI trainer = new GeneticAlgorithmAI(GameSettings.screenWidth, GameSettings.screenHeight);
+            trainer.startTraining();
+        }
 
 //        // 在訓練完成後，啟動遊戲主程式
 //        SwingUtilities.invokeLater(() -> {

@@ -39,7 +39,7 @@ public class GamePanel extends JPanel {
         this.ai = ai;
         this.restartAction = restartAction;
         this.steps = 0;
-        this.MAX_STEPS = SCREEN_WIDTH * SCREEN_HEIGHT;
+        this.MAX_STEPS = SCREEN_WIDTH + SCREEN_HEIGHT;
 
         // 設定面板填滿整個視窗
         this.setPreferredSize(new Dimension(Toolkit.getDefaultToolkit().getScreenSize()));
@@ -180,6 +180,7 @@ public class GamePanel extends JPanel {
 
         if (head.equals(food)) {
             score++;
+            steps = 0;
             newFood();
         } else {
             snakeBody.remove(snakeBody.size() - 1);
@@ -248,6 +249,12 @@ public class GamePanel extends JPanel {
                     // 傳遞 GamePanel 實例和重啟動作給 SettingsFrame
                     new SettingsFrame(GamePanel.this, restartAction);
                 }
+            }
+            if (e.getKeyCode() == KeyEvent.VK_R){
+                running = false;
+                Timer restartTimer = new Timer(1500, r -> startGame());
+                restartTimer.setRepeats(false); // 只執行一次
+                restartTimer.start();
             }
         }
     }
