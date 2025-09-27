@@ -1,53 +1,54 @@
 import javax.swing.JPanel;
 import javax.swing.Timer;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Graphics;
-import java.awt.Point;
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.Random;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import javax.swing.SwingUtilities;
+import java.awt.event.KeyAdapter;
+import java.util.concurrent.Semaphore;
 
 public class GamePanel extends JPanel implements ActionListener  { // 實現 ActionListener 介面
 
     // 遊戲常數
-    final int UNIT_SIZE = 25; // 每個方塊的大小
+    final int UNIT_SIZE = 25;
     final int SCREEN_WIDTH;
     final int SCREEN_HEIGHT;
     final int GAME_UNITS;
-    boolean paused = false; // 新增變數來追蹤遊戲是否暫停
-
-    // 蛇的身體座標
+    private int score;
+    private int moves;
     ArrayList<Point> snakeBody;
-    // 食物的座標
     Point food;
-    // 隨機數生成器
     Random random;
-    // 遊戲迴圈
     Timer timer;
-    // 遊戲狀態
-    boolean running = false;
-    // 蛇的移動方向
-    char direction = 'R'; // 預設向右 (Right)
+    boolean running;
+    boolean paused = false; // 新增變數來追蹤遊戲是否暫停
+    char direction = 'R'; //蛇的移動方向預設向右
 
-    public GamePanel() {
+    // 神經網路
+    private NeuralNetwork brain;
+    // 將靜態屬性移出，讓 GamePanel 獨立
+    private static final int MAX_MOVES_WITHOUT_FOOD = 2000;
+    // 用於主程式等待遊戲結束的信號量
+    private Semaphore gameSemaphore;
+
+    public GamePanel(NeuralNetwork brain) { //新增建構子來接收神經網路
         // 從 GameSettings 類別中取得畫面大小
         this.SCREEN_WIDTH = GameSettings.screenWidth;
         this.SCREEN_HEIGHT = GameSettings.screenHeight;
         this.GAME_UNITS = (SCREEN_WIDTH * SCREEN_HEIGHT) / (UNIT_SIZE * UNIT_SIZE);
 
         this.setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
-        // 設定背景顏色
         this.setBackground(Color.white);
         // 設定焦點，以便處理鍵盤事件 (未來可能會用到)
         this.setFocusable(true);
-        this.addKeyListener(new MyKeyAdapter()); // 為之後的自動化邏輯做準備
+        this.addKeyListener(new MyKeyAdapter());
 
-        random = new Random();
-        // 初始化遊戲物件
+        this.brain = brain;
+        this.random = new Random();
+        this.gameSemaphore = new Semaphore(0); // 初始為0，需要 acquire() 才能繼續
         initGame();
     }
 
@@ -60,7 +61,8 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
         // 初始化蛇的身體
         snakeBody = new ArrayList<>();
         direction = 'R'; // 重新開始時，方向重置為向右
-
+        score = 0;
+        moves = 0;
         // 計算蛇的初始位置在遊戲畫面的中心
         int startX = (SCREEN_WIDTH / (2 * UNIT_SIZE)) * UNIT_SIZE;
         int startY = (SCREEN_HEIGHT / (2 * UNIT_SIZE)) * UNIT_SIZE;
@@ -70,13 +72,9 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
         for (int i = 0; i < 3; i++) {
             snakeBody.add(new Point(startX - i * UNIT_SIZE, startY));
         }
-
-        // 生成第一顆食物
         newFood();
-
         // 啟動遊戲迴圈
         running = true;
-        // 使用 GameSettings 的 gameSpeed
         timer = new Timer(GameSettings.gameSpeed, this);
         timer.start();
     }
@@ -110,7 +108,6 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
             int foodX = random.nextInt((int) (SCREEN_WIDTH / UNIT_SIZE)) * UNIT_SIZE;
             int foodY = random.nextInt((int) (SCREEN_HEIGHT / UNIT_SIZE)) * UNIT_SIZE;
             food = new Point(foodX, foodY);
-
             foodOnSnake = false;
             // 檢查食物是否在蛇的身體上
             for (Point segment : snakeBody) {
@@ -173,6 +170,17 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
                 }
                 g.fillRect(offsetX + snakeBody.get(i).x, offsetY + snakeBody.get(i).y, UNIT_SIZE, UNIT_SIZE);
             }
+
+            // AI決策視覺化
+            if (brain != null) {
+                g.setColor(Color.black);
+                g.setFont(new Font("Arial", Font.PLAIN, 12));
+                double[] finalOutputs = brain.getFinalOutputs(getInputs());
+                g.drawString("AI Outputs:", offsetX + 10, offsetY + SCREEN_HEIGHT + 30);
+                g.drawString("Front: " + String.format("%.2f", finalOutputs[0]), offsetX + 10, offsetY + SCREEN_HEIGHT + 45);
+                g.drawString("Left: " + String.format("%.2f", finalOutputs[1]), offsetX + 10, offsetY + SCREEN_HEIGHT + 60);
+                g.drawString("Right: " + String.format("%.2f", finalOutputs[2]), offsetX + 10, offsetY + SCREEN_HEIGHT + 75);
+            }
         } else {
             // 遊戲結束畫面
             gameOver(g, offsetX, offsetY, this.getWidth());
@@ -183,15 +191,34 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
     @Override
     public void actionPerformed(ActionEvent e) {
         if (running && !paused) {
-            // 自動判斷食物方向並轉向
-            makeDecision();
-            // 呼叫移動方法
+            // 自動判斷食物方向並轉向(改用神經網路方法)
+            // 取得輸入
+            double[] inputs = getInputs();
+
+//            // --- 顯示神經網路的輸入 ---
+//            System.out.println("Inputs: " + java.util.Arrays.toString(inputs));
+//            // 取得神經網路的最終輸出
+//            double[] finalOutputs = brain.getFinalOutputs(inputs);
+//            // --- 顯示神經網路的輸出 ---
+//            System.out.println("Outputs (Straight, Left, Right): " + java.util.Arrays.toString(finalOutputs));
+
+            // 讓神經網路做出決策
+            int output = brain.predict(inputs);
+            setDirectionFromOutput(output);
             move();
             // 呼叫碰撞偵測方法
             checkCollisions();
             // 呼叫吃食物方法
             checkFood();
         }
+        if (!running) {
+            timer.stop();
+            // 如果有設定信號量，則在遊戲結束時釋放它
+            if (gameSemaphore != null) {
+                gameSemaphore.release();
+            }
+        }
+
         // 重新繪製畫面
         repaint();
     }
@@ -221,10 +248,10 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
         }
     }
 
-
     // 檢查蛇頭是否吃到食物(重疊)，增加蛇的長度
     public void checkFood() {
         if (snakeBody.get(0).equals(food)) {
+            score++;
             // 取得蛇尾的位置
             Point lastSegment = snakeBody.get(snakeBody.size() - 1);
             /// 根據蛇的移動方向，計算新的身體節點應該位於哪裡,
@@ -259,6 +286,8 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
         // 如果遊戲結束，停止 Timer
         if (!running) {
             timer.stop();
+            // 釋放信號，讓主程式繼續
+            gameSemaphore.release();
         }
     }
 
@@ -284,7 +313,7 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
 
         // 讓程式延遲五秒後重新開始
         // 我們需要使用 Swing 的 Timer 來避免阻塞事件處理線程
-        Timer restartTimer = new Timer(5000, new ActionListener() {
+        Timer restartTimer = new Timer(1500, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 // 重新開始遊戲
@@ -295,53 +324,6 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
         });
         restartTimer.setRepeats(false); // 只執行一次
         restartTimer.start();
-    }
-
-    // 自動化移動(朝向食物)
-    public void makeDecision() {
-        // 獲取蛇頭和食物的座標
-        Point head = snakeBody.get(0);
-        int headX = head.x;
-        int headY = head.y;
-        int foodX = food.x;
-        int foodY = food.y;
-
-        // 優先朝著食物方向移動
-        if (headX < foodX && direction != 'L') {
-            if (!isCollision(headX + UNIT_SIZE, headY)) {
-                direction = 'R';
-                return;
-            }
-        }
-        if (headX > foodX && direction != 'R') {
-            if (!isCollision(headX - UNIT_SIZE, headY)) {
-                direction = 'L';
-                return;
-            }
-        }
-        if (headY < foodY && direction != 'U') {
-            if (!isCollision(headX, headY + UNIT_SIZE)) {
-                direction = 'D';
-                return;
-            }
-        }
-        if (headY > foodY && direction != 'D') {
-            if (!isCollision(headX, headY - UNIT_SIZE)) {
-                direction = 'U';
-                return;
-            }
-        }
-
-        // 如果所有通往食物的路都被擋住了，隨機選擇一個不會碰撞的方向
-        if (!isCollision(headX + UNIT_SIZE, headY) && direction != 'L') {
-            direction = 'R';
-        } else if (!isCollision(headX - UNIT_SIZE, headY) && direction != 'R') {
-            direction = 'L';
-        } else if (!isCollision(headX, headY + UNIT_SIZE) && direction != 'U') {
-            direction = 'D';
-        } else if (!isCollision(headX, headY - UNIT_SIZE) && direction != 'D') {
-            direction = 'U';
-        }
     }
 
     // 實作一個檢查碰撞的方法
@@ -391,5 +373,153 @@ public class GamePanel extends JPanel implements ActionListener  { // 實現 Act
         paused = true;
         timer.stop();
         repaint();
+    }
+
+    // 與神經網路互動
+    public double[] getInputs() {
+        double[] inputs = new double[6];
+        Point head = snakeBody.get(0);
+
+        // 判斷前方、左方、右方是否有障礙物 (牆壁或身體)
+        // 0: 前方, 1: 左方, 2: 右方
+        for (int i = 0; i < 3; i++) {
+            Point nextPosition = getNextPosition(i);
+            inputs[i] = isCollision(nextPosition.x, nextPosition.y) ? 1.0 : 0.0;
+        }
+
+        // 判斷食物是否在前方、左方、右方
+        // 3: 食物在前方, 4: 食物在左方, 5: 食物在右方
+        // 這是基於當前方向的相對位置
+        inputs[3] = isFoodInFront() ? 1.0 : 0.0;
+        inputs[4] = isFoodToLeft() ? 1.0 : 0.0;
+        inputs[5] = isFoodToRight() ? 1.0 : 0.0;
+
+        return inputs;
+    }
+    // 新增：判斷食物是否在前方
+    private boolean isFoodInFront() {
+        Point head = snakeBody.get(0);
+        // 如果蛇向右，食物在右方代表在前方
+        if (direction == 'R' && food.x > head.x) return true;
+        // 如果蛇向左，食物在左方代表在前方
+        if (direction == 'L' && food.x < head.x) return true;
+        // 如果蛇向上，食物在上方代表在前方
+        if (direction == 'U' && food.y < head.y) return true;
+        // 如果蛇向下，食物在下方代表在前方
+        if (direction == 'D' && food.y > head.y) return true;
+        return false;
+    }
+
+    // 新增：判斷食物是否在左方
+    private boolean isFoodToLeft() {
+        Point head = snakeBody.get(0);
+        // 根據當前方向判斷「左方」的位置
+        if (direction == 'R' && food.y < head.y) return true;
+        if (direction == 'L' && food.y > head.y) return true;
+        if (direction == 'U' && food.x < head.x) return true;
+        if (direction == 'D' && food.x > head.x) return true;
+        return false;
+    }
+
+    // 新增：判斷食物是否在右方
+    private boolean isFoodToRight() {
+        Point head = snakeBody.get(0);
+        // 根據當前方向判斷「右方」的位置
+        if (direction == 'R' && food.y > head.y) return true;
+        if (direction == 'L' && food.y < head.y) return true;
+        if (direction == 'U' && food.x > head.x) return true;
+        if (direction == 'D' && food.x < head.x) return true;
+        return false;
+    }
+
+    // 新增：根據方向索引取得下一個位置
+    // 0: 前方, 1: 左方, 2: 右方
+    private Point getNextPosition(int relativeDirection) {
+        Point head = snakeBody.get(0);
+        int nextX = head.x;
+        int nextY = head.y;
+        char currentDirection = direction;
+
+        if (relativeDirection == 0) { // 前方
+            if (currentDirection == 'R') nextX += UNIT_SIZE;
+            else if (currentDirection == 'L') nextX -= UNIT_SIZE;
+            else if (currentDirection == 'U') nextY -= UNIT_SIZE;
+            else if (currentDirection == 'D') nextY += UNIT_SIZE;
+        } else if (relativeDirection == 1) { // 左方
+            if (currentDirection == 'R') nextY -= UNIT_SIZE;
+            else if (currentDirection == 'L') nextY += UNIT_SIZE;
+            else if (currentDirection == 'U') nextX -= UNIT_SIZE;
+            else if (currentDirection == 'D') nextX += UNIT_SIZE;
+        } else if (relativeDirection == 2) { // 右方
+            if (currentDirection == 'R') nextY += UNIT_SIZE;
+            else if (currentDirection == 'L') nextY -= UNIT_SIZE;
+            else if (currentDirection == 'U') nextX += UNIT_SIZE;
+            else if (currentDirection == 'D') nextX -= UNIT_SIZE;
+        }
+
+        return new Point(nextX, nextY);
+    }
+
+    // 神經網路的輸出
+    private void setDirectionFromOutput(int output) {
+        // 取得當前方向
+        char currentDirection = direction;
+
+        // 根據輸出更新方向
+        if (output == 0) {
+            // 直走，方向不變
+        } else if (output == 1) {
+            // 向左轉
+            switch (currentDirection) {
+                case 'U': direction = 'L'; break;
+                case 'D': direction = 'R'; break;
+                case 'L': direction = 'D'; break;
+                case 'R': direction = 'U'; break;
+            }
+        } else if (output == 2) {
+            // 向右轉
+            switch (currentDirection) {
+                case 'U': direction = 'R'; break;
+                case 'D': direction = 'L'; break;
+                case 'L': direction = 'U'; break;
+                case 'R': direction = 'D'; break;
+            }
+        }
+    }
+    // 回傳這條蛇的適應度
+    public double getFitness() {
+        return score * 1000 + moves; // 這裡可以調整權重
+    }
+
+    // 專為訓練設計的模擬方法 (無畫面)
+    public double runSimulation() {
+        snakeBody = new ArrayList<>();
+        direction = 'R';
+        score = 0;
+        moves = 0;
+        int startX = (SCREEN_WIDTH / (2 * UNIT_SIZE)) * UNIT_SIZE;
+        int startY = (SCREEN_HEIGHT / (2 * UNIT_SIZE)) * UNIT_SIZE;
+        snakeBody.add(new Point(startX, startY));
+        for (int i = 0; i < 3; i++) {
+            snakeBody.add(new Point(startX - (i + 1) * UNIT_SIZE, startY));
+        }
+        newFood();
+        running = true;
+
+        while(running && moves < MAX_MOVES_WITHOUT_FOOD) {
+            actionPerformed(null);
+            moves++;
+        }
+        return getFitness();
+    }
+
+    // 更換 AI 腦袋
+    public void setBrain(NeuralNetwork newBrain) {
+        this.brain = newBrain;
+        initGame();
+    }
+
+    public void setGameSemaphore(Semaphore semaphore) {
+        this.gameSemaphore = semaphore;
     }
 }
